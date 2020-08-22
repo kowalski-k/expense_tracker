@@ -1,5 +1,6 @@
 import PySimpleGUI as sg
 import numpy as np
+import time 
 from sql_connection import *
 from gui_events import *
 
@@ -7,6 +8,7 @@ from gui_events import *
 sg.theme('Dark')
 font = ('Helvetica', 10, 'bold')
 
+exps = get_all_expenses()
 
 left  = [[sg.Table(exps, headings=["Name", "Price", "Date", "Category", "Notes"],
                 hide_vertical_scroll=True, pad=(0, 0),
@@ -20,7 +22,7 @@ left  = [[sg.Table(exps, headings=["Name", "Price", "Date", "Category", "Notes"]
 column = [[sg.Column(left, pad=(0, 0))]]     
 layout = [  [ sg.Button('Add expense', font=font, pad=(0, 5), key='-add-'), 
               sg.Button('Statistics', font=font, pad=(5, 5)),
-              sg.Input('Type something', key='-IN-'),
+              sg.Input('Search', key='-in_filter-'),
               sg.Button('Filter', font=font, pad=(0, 5), key='-filter-') ],
             [sg.Column(column, scrollable=True)],
             [   sg.Input('Type name of expense', key='-edit_delete_name-'),
@@ -56,7 +58,7 @@ while True:
 # -----------------Filtering---------------------------------
 
     if event == '-filter-':
-        pass
+        filter_and_show(window, values)     
 
 
 

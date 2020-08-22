@@ -37,7 +37,7 @@ def add_expense_window(window):
             if event2 == '-add_and_close-':
                 # insert_expense(Expense('apple', '5.50', '02-12-1202','food', 'sfdsf'))
                 insert_expense(Expense(values2['-in_name-'].lower(), values2['-in_price-'], values2['-in_date-'], values2['-in_category-'].lower(), values2['-in_notes-']))
-                exps = get_expense_by_category('food')
+                exps = get_all_expenses()
 
                 window['-database-'].update(exps)
                 break
@@ -79,7 +79,7 @@ def edit_expense_window(window, values):
 
             if event2 == '-edit_and_close-':
                 edit_expense(Expense(values2['-in_name-'].lower(), values2['-in_price-'], values2['-in_date-'], values2['-in_category-'].lower(), values2['-in_notes-']), to_edit_exp[0][0])
-                exps = get_expense_by_category('food')
+                exps = get_all_expenses()
 
                 window['-database-'].update(exps)
                 break
@@ -111,9 +111,27 @@ def delete_expense_window(window, values):
 
             if event2 == '-edit_and_close-':
                 remove_expense(to_del_exp[0][0])
-                exps = get_expense_by_category('food')
+                exps = get_all_expenses()
 
                 window['-database-'].update(exps)
                 break
 
         window2.close()
+
+# -----------------Filtering---------------------------------
+
+def filter_and_show(window, values):
+        if values['-in_filter-'].lower() == '':
+            exps_filter = get_all_expenses()
+            window['-database-'].update(exps_filter)   
+
+        elif is_in_categories(values['-in_filter-'].lower()):
+            exps_filter = get_expense_by_category(values['-in_filter-'].lower())
+            window['-database-'].update(exps_filter)
+
+        elif is_in_expenses(values['-in_filter-'].lower()):
+            exps_filter = get_expense_by_name(values['-in_filter-'].lower())
+            window['-database-'].update(exps_filter)
+
+        else:
+            sg.popup('', 'There is no such record :(\n')
