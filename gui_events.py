@@ -1,5 +1,9 @@
 import PySimpleGUI as sg
+import pandas as pd
+import calendar, datetime
+from decimal import Decimal
 from sql_connection import *
+from plot_functions import *
 font = ('Helvetica', 10, 'bold')
 
 # -----------------Adding---------------------------------
@@ -10,8 +14,7 @@ def add_expense_window(window):
                 [sg.Text('Price', font=font)],
                 [sg.CalendarButton('Calendar', font=font, key='CAL', target='-in_date-', format=('%d-%m-%Y'))],
                 [sg.Text('Category', font=font)],
-                [sg.Text('Notes', font=font)],
-                [sg.Button('Add', font=font, key='-add_and_close-')] ]
+                [sg.Text('Notes', font=font)] ]
 
         right2 = [  [sg.Text('', font=font)],
                     [sg.Input(key='-in_name-')],
@@ -21,9 +24,10 @@ def add_expense_window(window):
                     [sg.Input(key='-in_notes-')] ]
 
         column2 = [[sg.Column(left2, pad=(0, 0)), sg.Column(right2, pad=(0, 0))]]
-        layout2 = [[sg.Column(column2)]]
+        layout2 = [ [sg.Column(column2)],
+                    [sg.Button('Add', font=font, key='-add_and_close-')]]
 
-        window2 = sg.Window('Add expense', layout2)
+        window2 = sg.Window('Add expense', layout2, element_justification="center")
 
         while True:
 
@@ -43,6 +47,7 @@ def add_expense_window(window):
                 break
 
         window2.close()
+        all_expenses = pd.read_sql_query("SELECT * FROM expenses", conn)
 
 
 # -----------------Editing---------------------------------
@@ -54,8 +59,7 @@ def edit_expense_window(window, values):
                 [sg.Text('Price', font=font)],
                 [sg.CalendarButton('Calendar', font=font, key='CAL', target='-in_date-', format=('%d-%m-%Y'))],
                 [sg.Text('Category', font=font)],
-                [sg.Text('Notes', font=font)],
-                [sg.Button('Edit', font=font, key='-edit_and_close-')] ]
+                [sg.Text('Notes', font=font)] ]
 
         right2 = [  [sg.Text('', font=font)],
                     [sg.Input(f'{to_edit_exp[0][0]}', key='-in_name-')],
@@ -65,9 +69,10 @@ def edit_expense_window(window, values):
                     [sg.Input(f'{to_edit_exp[0][4]}', key='-in_notes-')] ]
 
         column2 = [[sg.Column(left2, pad=(0, 0)), sg.Column(right2, pad=(0, 0))]]
-        layout2 = [[sg.Column(column2)]]
+        layout2 = [ [sg.Column(column2)],
+                    [sg.Button('Edit', font=font, key='-edit_and_close-')]]
 
-        window2 = sg.Window('Edit expense', layout2)
+        window2 = sg.Window('Edit expense', layout2, element_justification="center")
 
         while True:
 
@@ -85,6 +90,7 @@ def edit_expense_window(window, values):
                 break
 
         window2.close()
+        all_expenses = pd.read_sql_query("SELECT * FROM expenses", conn)
 
 # -----------------Deleting---------------------------------
 
@@ -117,6 +123,7 @@ def delete_expense_window(window, values):
                 break
 
         window2.close()
+        all_expenses = pd.read_sql_query("SELECT * FROM expenses", conn)
 
 # -----------------Filtering---------------------------------
 
@@ -135,3 +142,132 @@ def filter_and_show(window, values):
 
         else:
             sg.popup('', 'There is no such record :(\n')
+
+
+# -----------------Making pie plot---------------------------------
+
+def make_pie_plot(window, all_expenses):
+    all_expenses['date_of_expense'] = pd.to_datetime(all_expenses['date_of_expense'], dayfirst=True)
+                    
+    months = list(set(all_expenses['date_of_expense'].dt.month))
+    months = [calendar.month_name[i] for i in months]
+    months.insert(0, 'ALL')
+    years = list(set(all_expenses['date_of_expense'].dt.year))
+    years.insert(0, 'ALL')
+
+    layout3 = [ [sg.Text('Choose time interval of statistics', font=font), sg.Listbox(font=font, values=months, enable_events=True, size=(10,3), key='-month-'), 
+                 sg.Listbox(font=font, values=years, enable_events=True, size=(10,3), key='-year-'), sg.Button('Show', font=font, key='-show_plot-')],
+                [sg.Text('', font=font)],
+                [sg.Canvas(key='-canvas-')],
+                [sg.OK()]]                
+
+    window3 = sg.Window('Pie plot', layout3, element_justification="center")
+
+    while True:
+        event3, values3 = window3.read()
+
+        if event3 == sg.WINDOW_CLOSED or event3 == sg.WINDOW_CLOSED:
+            break
+
+        if event3 == '-show_plot-':
+                    
+            # Conditions for years
+            if (values3['-year-'][0] == 'ALL'):
+                data = all_expenses
+
+            else:
+                data = all_expenses[all_expenses['date_of_expense'].dt.year == values3['-year-'][0]]
+
+            # Conditions for months
+            if values3['-month-'][0] == 'ALL':                            
+                data = data
+
+            else:
+                # Changing format of month from name to number
+                month_number = datetime.datetime.strptime(values3['-month-'][0], "%B")
+                month_number = month_number.month
+                data = data[data['date_of_expense'].dt.month == month_number]
+
+
+            total_amount_per_cat = []
+            labels = list(set(data['category']))
+            
+            for cat in labels:
+                am = data[data['category'] == cat]
+                am['amount'] = [Decimal(i) for i in am['amount']]
+                total_amount_per_cat.append(am['amount'].sum())
+
+            fig = matplotlib.figure.Figure(figsize=(5, 4), dpi=100)
+            fig.add_subplot(111).pie(total_amount_per_cat, labels=labels, autopct='%1.1f%%', shadow=True)
+
+            draw_figure(window3["-canvas-"].TKCanvas, fig)
+    window3.close()
+
+
+# -----------------Making bar plot---------------------------------
+
+def make_bar_plot(window, all_expenses):
+    categories = list(set(all_expenses['category']))
+
+    all_expenses['date_of_expense'] = pd.to_datetime(all_expenses['date_of_expense'], dayfirst=True)
+                    
+    months = list(set(all_expenses['date_of_expense'].dt.month))
+    months = [calendar.month_name[i] for i in months]
+    years = list(set(all_expenses['date_of_expense'].dt.year))
+    years.insert(0, "ALL")
+
+    layout3 = [ [sg.Text('Choose category', font=font), sg.Listbox(font=font, values=categories, size=(15,3), key='-category-'),
+                 sg.OK(font=font, key='-cat_button-')],
+                [sg.Text('Choose time interval of statistics', font=font), 
+                 sg.Listbox(font=font, values=years, size=(10,3), key='-year-'), sg.Button('Show', font=font, key='-show_plot-')],
+                [sg.Text('', font=font)],
+                [sg.Canvas(key='-canvas-')],
+                [sg.OK(font=font)]]                
+
+    window3 = sg.Window('Bar plot', layout3, element_justification="center")
+
+    while True:
+        event3, values3 = window3.read()
+
+        if event3 == sg.WINDOW_CLOSED or event3 == 'OK':
+            break
+
+        if event3 == '-cat_button-':
+            data = all_expenses
+            data = data[data['category'] == values3['-category-'][0]]
+
+            months = list(set(data['date_of_expense'].dt.month))
+            months = [calendar.month_name[i] for i in months]
+            years = list(set(data['date_of_expense'].dt.year))
+            years.insert(0, 'ALL')
+            window3['-year-'].update(values=years)
+
+        if event3 == '-show_plot-':
+                    
+            # Conditions for years
+            if (values3['-year-'][0] == 'ALL'):
+                data = data
+
+            else:
+                data = data[data['date_of_expense'].dt.year == values3['-year-'][0]]
+
+            total_amount_per_month = []
+            labels = months
+            x = np.arange(len(labels))
+            
+            for m in list(set(data['date_of_expense'].dt.month)):
+                am = data[data['date_of_expense'].dt.month == m]
+                am['amount'] = [Decimal(i) for i in am['amount']]
+                total_amount_per_month.append(am['amount'].sum())
+
+            p1 = plt.bar(x, total_amount_per_month)
+            plt.ylabel('Amount')
+            plt.xlabel('Months')
+            plt.xticks(x, labels)
+
+            fig = plt.gcf()
+
+            draw_figure(window3["-canvas-"].TKCanvas, fig)
+    window3.close()   
+
+# -----------------     ---------------------------------
